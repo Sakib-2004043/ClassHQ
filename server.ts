@@ -21,6 +21,15 @@ const PORT = 3000;
 // Initialize MongoDB in background without blocking server boot
 initMongoDB().catch((err) => console.error('[ClassHQ] MongoDB init error:', err));
 
+// Health Check Routes (Top-level for instant Cloud Run and container probe responses)
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    app: 'ClassHQ Academic Attendance & Leave Management',
+    time: new Date().toISOString(),
+  });
+});
+
 // Global Middlewares
 app.use(
   cors({
@@ -32,27 +41,14 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(authMiddleware);
 
-// Middleware to ensure DB connection readiness on serverless or cold starts
-app.use(async (req, res, next) => {
-  if (process.env.MONGO_URI || process.env.MONGODB_URI) {
+// Non-blocking background reconnect trigger for API routes
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api') && (process.env.MONGO_URI || process.env.MONGODB_URI)) {
     if (!isMongoConnected) {
-      try {
-        await initMongoDB();
-      } catch (err) {
-        console.error('[ClassHQ] MongoDB cold start connect error:', err);
-      }
+      initMongoDB().catch(() => {});
     }
   }
   next();
-});
-
-// Primary Health Check Route
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    app: 'ClassHQ Academic Attendance & Leave Management',
-    time: new Date().toISOString(),
-  });
 });
 
 // Mount Modular API Routers

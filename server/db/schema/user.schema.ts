@@ -1,5 +1,5 @@
 import { Schema } from 'mongoose';
-import { normalizeBatch } from '../helpers';
+import { normalizeBatch } from '../helpers.ts';
 
 export const UserSchema = new Schema(
   {
