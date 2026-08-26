@@ -1,0 +1,8 @@
+{
+  "name": "ClassHQ",
+  "description": "Production-ready Academic Attendance and Leave Management System with Role-Based Portals for Students, Class Captains, and Academic Administrators.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
