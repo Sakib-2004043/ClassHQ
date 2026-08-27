@@ -74,9 +74,9 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     let errorMsg = data?.error;
     if (!errorMsg) {
       if (res.status === 403) {
-        errorMsg = 'Account approval is pending verification by your Class Captain or Academic Administrator.';
+        errorMsg = 'Access denied. You do not have authorization to view or modify this resource.';
       } else if (res.status === 401) {
-        errorMsg = 'Invalid credentials. Please verify your roll number / email and password.';
+        errorMsg = 'Invalid or expired session. Please log in again.';
       } else if (res.status === 404) {
         errorMsg = 'Requested resource not found.';
       } else {
@@ -99,10 +99,10 @@ export const api = {
     body: JSON.stringify(body),
   }),
 
-  login: (emailOrRoll: string, password: string) =>
+  login: (email: string, password: string) =>
     request<{ success: boolean; token: string; user: AuthSessionPayload }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ emailOrRoll, password }),
+      body: JSON.stringify({ email, emailOrRoll: email, password }),
     }),
 
   quickLogin: (role?: string, email?: string) =>
@@ -221,6 +221,14 @@ export const api = {
     if (batch) params.append('batch', batch);
     if (section) params.append('section', section);
     return request<CaptainSectionStats>(`/captain/section-stats?${params.toString()}`);
+  },
+
+  getCaptainStudents: (filters: { group?: string; approval?: string; search?: string }) => {
+    const params = new URLSearchParams();
+    if (filters.group) params.append('group', filters.group);
+    if (filters.approval) params.append('approval', filters.approval);
+    if (filters.search) params.append('search', filters.search);
+    return request<{ total: number; students: User[] }>(`/captain/students?${params.toString()}`);
   },
 
   // Admin

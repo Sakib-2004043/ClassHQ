@@ -39,7 +39,7 @@ export const AuthPage: React.FC<{ initialTab?: 'login' | 'register' }> = ({ init
   const [activeTab, setActiveTab] = useState<'login' | 'register'>(initialTab);
 
   // Login form state
-  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -92,25 +92,25 @@ export const AuthPage: React.FC<{ initialTab?: 'login' | 'register' }> = ({ init
     setLoginError(null);
     setLoginSubmitting(true);
 
-    if (!loginIdentifier || !loginPassword) {
-      setLoginError('Please enter both your Roll Number/Email and password.');
+    if (!loginEmail || !loginPassword) {
+      setLoginError('Please enter both your registered email address and password.');
       setLoginSubmitting(false);
       return;
     }
 
-    const res = await login(loginIdentifier, loginPassword);
+    const res = await login(loginEmail, loginPassword);
     setLoginSubmitting(false);
     if (!res.success) {
       if (res.isPending) {
         setLoginError(null);
       } else {
-        setLoginError(res.error || 'Login failed. Please check credentials.');
+        setLoginError(res.error || 'Login failed. Please check your credentials.');
       }
     }
   };
 
   const handleRecheckStatus = async () => {
-    if (!loginIdentifier || !loginPassword) {
+    if (!loginEmail || !loginPassword) {
       setActiveTab('login');
       return;
     }
@@ -146,10 +146,12 @@ export const AuthPage: React.FC<{ initialTab?: 'login' | 'register' }> = ({ init
       return;
     }
 
+    const sanitizedRoll = formData.rollNumber.replace(/\D/g, '').slice(0, 3).replace(/^0+/, '') || '0';
+
     setRegisterSubmitting(true);
     const res = await registerStudent({
       fullName: formData.fullName,
-      rollNumber: formData.rollNumber,
+      rollNumber: sanitizedRoll,
       email: formData.email,
       phoneNumber: formData.phoneNumber,
       gender: formData.gender,
@@ -163,7 +165,7 @@ export const AuthPage: React.FC<{ initialTab?: 'login' | 'register' }> = ({ init
     setRegisterSubmitting(false);
 
     if (res.success) {
-      setLoginIdentifier(formData.rollNumber || formData.email);
+      setLoginEmail(formData.email);
       setLoginPassword(formData.password);
       setActiveTab('login');
       setRegisterSuccess(
@@ -358,7 +360,7 @@ export const AuthPage: React.FC<{ initialTab?: 'login' | 'register' }> = ({ init
                       <span>👋</span>
                     </h3>
                     <p className="text-[10px] font-medium text-indigo-200/80">
-                      Sign in with your Roll Number or Email
+                      Sign in with your registered Email Address
                     </p>
                   </div>
                 </div>
@@ -371,12 +373,12 @@ export const AuthPage: React.FC<{ initialTab?: 'login' | 'register' }> = ({ init
                     </div>
                   )}
 
-                  {/* Roll Number or Email Field - Indigo Themed Container */}
+                  {/* Registered Email Field - Indigo Themed Container */}
                   <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-950/70 border border-indigo-500/40 space-y-1 transition-all focus-within:bg-indigo-900/60 focus-within:border-indigo-400 shadow-xs">
                     <label className="text-[9px] font-bold uppercase tracking-wider text-indigo-300 flex items-center justify-between">
                       <span className="flex items-center gap-1">
-                        <Hash className="w-3 h-3 text-indigo-400" />
-                        <span>Roll Number or Email</span>
+                        <Mail className="w-3 h-3 text-indigo-400" />
+                        <span>Email Address</span>
                       </span>
                       <span className="px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 text-[8px] font-bold border border-indigo-400/30">
                         Required
@@ -385,15 +387,15 @@ export const AuthPage: React.FC<{ initialTab?: 'login' | 'register' }> = ({ init
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
                         <div className="w-5 h-5 rounded bg-indigo-600/30 text-indigo-300 flex items-center justify-center border border-indigo-500/30">
-                          <User className="w-3 h-3" />
+                          <Mail className="w-3 h-3" />
                         </div>
                       </div>
                       <input
-                        id="input-login-identifier"
-                        type="text"
-                        placeholder="e.g. 260101 or student@college.edu"
-                        value={loginIdentifier}
-                        onChange={(e) => setLoginIdentifier(e.target.value)}
+                        id="input-login-email"
+                        type="email"
+                        placeholder="e.g. student@college.edu or captain@college.edu"
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
                         required
                         className="w-full pl-9 pr-3 py-1.5 text-[11px] font-bold text-white bg-slate-900/90 border border-indigo-500/30 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-indigo-400 transition-all placeholder:text-slate-500 shadow-inner"
                       />
@@ -532,14 +534,18 @@ export const AuthPage: React.FC<{ initialTab?: 'login' | 'register' }> = ({ init
                   <div className="p-2 rounded-xl bg-violet-950/60 border border-violet-500/40 space-y-1 transition-all focus-within:bg-violet-900/60 focus-within:border-violet-400 shadow-xs">
                     <label className="text-[9px] font-bold uppercase tracking-wider text-violet-300 flex items-center gap-1">
                       <Hash className="w-3 h-3 text-violet-400" />
-                      <span>Roll Number (6 Digits):</span>
+                      <span>Roll Number (Max 3 Digits):</span>
                     </label>
                     <div className="relative">
                       <input
                         type="text"
-                        placeholder="e.g. 260120"
+                        placeholder="e.g. 997 or 14"
                         value={formData.rollNumber}
-                        onChange={(e) => setFormData({ ...formData, rollNumber: e.target.value })}
+                        maxLength={3}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 3);
+                          setFormData({ ...formData, rollNumber: val });
+                        }}
                         required
                         className="w-full px-2.5 py-1.5 text-[11px] font-mono font-bold text-white bg-slate-900/90 border border-violet-500/30 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-violet-400 placeholder:text-slate-500 shadow-inner"
                       />
@@ -662,7 +668,7 @@ export const AuthPage: React.FC<{ initialTab?: 'login' | 'register' }> = ({ init
                 <div className="p-2 rounded-xl bg-orange-950/60 border border-orange-500/40 space-y-1 transition-all focus-within:bg-orange-900/60 focus-within:border-orange-400 shadow-xs">
                   <label className="text-[9px] font-bold uppercase tracking-wider text-orange-300 flex items-center gap-1">
                     <MapPin className="w-3 h-3 text-orange-400" />
-                    <span>Permanent Address:</span>
+                    <span>Detailed Address:</span>
                   </label>
                   <div className="relative">
                     <input

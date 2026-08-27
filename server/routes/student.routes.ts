@@ -10,7 +10,7 @@ import {
   findUserByEmail,
   getSystemSettingsDB,
 } from '../db/index.ts';
-import { requireAuth, AuthenticatedRequest } from '../auth.ts';
+import { requireAuth, requireRoles, authMiddleware, AuthenticatedRequest } from '../auth.ts';
 import { isTimeWithinWindow } from '../utils/timeWindow.ts';
 import {
   AttendanceRecord,
@@ -20,6 +20,9 @@ import {
 } from '../../src/types.ts';
 
 export const studentRouter = Router();
+
+studentRouter.use(authMiddleware);
+studentRouter.use(requireRoles(['student', 'captain']));
 
 // Student Dashboard Stats
 studentRouter.get('/dashboard-stats', requireAuth, async (req: AuthenticatedRequest, res: Response) => {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   CheckCircle2, 
@@ -13,7 +13,11 @@ import {
   ShieldAlert,
   Download,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  MessageSquare,
+  Pencil,
+  Plus,
+  X
 } from 'lucide-react';
 import { AttendanceStatus } from '../../../types';
 import { useAuth } from '../../../context/AuthContext';
@@ -43,7 +47,7 @@ interface CaptainRollCallViewProps {
   roster: RosterItem[];
   onChangeRosterStatus: (studentId: string, status: AttendanceStatus) => void;
   onChangeRosterCaptainsNote: (studentId: string, captainsNote: string) => void;
-  onBulkSetStatus: (status: AttendanceStatus) => void;
+  onBulkSetStatus?: (status: AttendanceStatus) => void;
   onSaveAttendance: () => Promise<void>;
   saving: boolean;
   saveSuccess: string | null;
@@ -100,6 +104,100 @@ const getDisplayCaptainNote = (note?: string) => {
     return '';
   }
   return note;
+};
+
+interface CaptainNoteCellProps {
+  note?: string;
+  onSave: (newNote: string) => void;
+}
+
+const CaptainNoteCell: React.FC<CaptainNoteCellProps> = ({ note = '', onSave }) => {
+  const displayNote = getDisplayCaptainNote(note);
+  const [isEditing, setIsEditing] = useState(false);
+  const [value, setValue] = useState(displayNote);
+
+  useEffect(() => {
+    setValue(displayNote);
+  }, [displayNote]);
+
+  const handleSave = () => {
+    setIsEditing(false);
+    onSave(value.trim());
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-1.5 w-full">
+        <input
+          type="text"
+          autoFocus
+          placeholder="Enter captain note..."
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleSave();
+            if (e.key === 'Escape') {
+              setValue(displayNote);
+              setIsEditing(false);
+            }
+          }}
+          onBlur={handleSave}
+          className="w-full px-2.5 py-1 text-xs font-medium bg-white border-2 border-sky-400 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-hidden shadow-2xs"
+        />
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            handleSave();
+          }}
+          className="p-1 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors cursor-pointer shrink-0"
+          title="Save Note"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    );
+  }
+
+  if (displayNote) {
+    return (
+      <div className="flex items-center justify-between gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50/90 border border-sky-200/90 text-sky-950 text-xs font-medium group">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <MessageSquare className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+          <span className="truncate">{displayNote}</span>
+        </div>
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsEditing(true)}
+            className="p-1 text-slate-400 hover:text-sky-600 hover:bg-white rounded-md transition-colors cursor-pointer"
+            title="Edit Note"
+          >
+            <Pencil className="w-3 h-3" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave('')}
+            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-white rounded-md transition-colors cursor-pointer"
+            title="Delete Note"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setIsEditing(true)}
+      className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-sky-600 transition-colors py-0.5 px-2 rounded-lg hover:bg-sky-50/80 border border-dashed border-slate-200 hover:border-sky-300 cursor-pointer"
+    >
+      <Plus className="w-3 h-3 text-slate-400" />
+      <span>Add Note</span>
+    </button>
+  );
 };
 
 export const CaptainRollCallView: React.FC<CaptainRollCallViewProps> = ({
@@ -348,56 +446,16 @@ export const CaptainRollCallView: React.FC<CaptainRollCallViewProps> = ({
         </div>
       )}
 
-      {/* Bulk Action & Search Bar */}
-      <div className="p-2.5 sm:p-3 bg-white/90 backdrop-blur-md rounded-2xl border border-sky-200/80 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2">
-        {/* Bulk Action Buttons */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 w-full md:w-auto">
-          <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 shrink-0">Bulk Mark:</span>
-          <div className="grid grid-cols-2 xs:grid-cols-4 gap-1 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={() => onBulkSetStatus('present')}
-              className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-extrabold uppercase tracking-wider rounded-lg border border-emerald-200 transition-colors flex items-center justify-center gap-1 shadow-2xs cursor-pointer active:scale-95"
-            >
-              <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-              <span>Present</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onBulkSetStatus('absent')}
-              className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-800 text-[10px] font-extrabold uppercase tracking-wider rounded-lg border border-rose-200 transition-colors flex items-center justify-center gap-1 shadow-2xs cursor-pointer active:scale-95"
-            >
-              <XCircle className="w-3 h-3 text-rose-600 shrink-0" />
-              <span>Absent</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onBulkSetStatus('leave')}
-              className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-extrabold uppercase tracking-wider rounded-lg border border-amber-200 transition-colors flex items-center justify-center gap-1 shadow-2xs cursor-pointer active:scale-95"
-            >
-              <Clock className="w-3 h-3 text-amber-600 shrink-0" />
-              <span>Leave</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onBulkSetStatus('fraud')}
-              className="px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-900 text-[10px] font-extrabold uppercase tracking-wider rounded-lg border border-purple-200 transition-colors flex items-center justify-center gap-1 shadow-2xs cursor-pointer active:scale-95"
-            >
-              <ShieldAlert className="w-3 h-3 text-purple-600 shrink-0" />
-              <span>Fraud</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Student Search */}
-        <div className="relative w-full md:w-56">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2 pointer-events-none" />
+      {/* Student Search Bar */}
+      <div className="p-2 sm:p-2.5 bg-white/90 backdrop-blur-md rounded-2xl border border-sky-200/80 shadow-2xs">
+        <div className="relative w-full">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
           <input
             type="text"
-            placeholder="Search name, roll..."
+            placeholder="Search student by name, roll..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-8 pr-2.5 py-1 text-[11px] font-medium bg-white border border-sky-200 text-slate-800 placeholder:text-slate-400 rounded-xl focus:outline-hidden focus:border-sky-500"
+            className="w-full pl-8.5 pr-3 py-1.5 text-xs font-medium bg-white border border-sky-200 text-slate-800 placeholder:text-slate-400 rounded-xl focus:outline-hidden focus:border-sky-500 shadow-2xs"
           />
         </div>
       </div>
@@ -519,13 +577,10 @@ export const CaptainRollCallView: React.FC<CaptainRollCallViewProps> = ({
                       })}
                     </div>
 
-                    {/* Note Input */}
-                    <input
-                      type="text"
-                      placeholder="Captain note / remark..."
-                      value={getDisplayCaptainNote(st.captainsNote)}
-                      onChange={(e) => onChangeRosterCaptainsNote(st.studentId, e.target.value)}
-                      className="w-full px-2 py-1 text-[10px] bg-white border border-sky-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:border-sky-500 focus:outline-hidden"
+                    {/* Note Display / Action */}
+                    <CaptainNoteCell
+                      note={st.captainsNote}
+                      onSave={(newNote) => onChangeRosterCaptainsNote(st.studentId, newNote)}
                     />
                   </div>
                 );
@@ -640,12 +695,9 @@ export const CaptainRollCallView: React.FC<CaptainRollCallViewProps> = ({
                           </div>
                         </td>
                         <td className="py-2 px-2.5">
-                          <input
-                            type="text"
-                            placeholder="Captain's note..."
-                            value={getDisplayCaptainNote(st.captainsNote)}
-                            onChange={(e) => onChangeRosterCaptainsNote(st.studentId, e.target.value)}
-                            className="w-full px-2 py-1 text-[11px] font-medium bg-white border border-sky-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:border-sky-500 focus:outline-hidden"
+                          <CaptainNoteCell
+                            note={st.captainsNote}
+                            onSave={(newNote) => onChangeRosterCaptainsNote(st.studentId, newNote)}
                           />
                         </td>
                       </tr>

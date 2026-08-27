@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import {
   findUserByEmail,
   findUserByRoll,
+  findUserByRollAndBatch,
   findUserById,
   getAllUsers,
   createUser,
@@ -54,15 +55,23 @@ authRouter.post('/register', async (req, res) => {
       return;
     }
 
+    const rawRoll = (rollNumber || '').toString().trim().replace(/\D/g, '').slice(0, 3);
+    const cleanRoll = rawRoll.replace(/^0+/, '') || '0';
+
+    if (!cleanRoll) {
+      res.status(400).json({ error: 'Please provide a valid numeric roll number (max 3 digits).' });
+      return;
+    }
+
     const existingEmail = await findUserByEmail(email);
     if (existingEmail) {
       res.status(400).json({ error: `An account with email '${email}' is already registered.` });
       return;
     }
 
-    const existingRoll = await findUserByRoll(rollNumber);
-    if (existingRoll) {
-      res.status(400).json({ error: `Roll number '${rollNumber}' is already registered.` });
+    const existingRollInBatch = await findUserByRollAndBatch(cleanRoll, batch);
+    if (existingRollInBatch) {
+      res.status(400).json({ error: `Roll number '${cleanRoll}' is already registered in ${batch}.` });
       return;
     }
 
@@ -74,7 +83,7 @@ authRouter.post('/register', async (req, res) => {
     const newUser: User = {
       id: `usr-${assignedRole}-${Date.now()}`,
       fullName: fullName.trim(),
-      rollNumber: rollNumber.trim().toUpperCase(),
+      rollNumber: cleanRoll,
       email: email.trim().toLowerCase(),
       phoneNumber: phoneNumber.trim(),
       gender: gender as Gender,
@@ -114,20 +123,18 @@ authRouter.post('/register', async (req, res) => {
 // Login
 authRouter.post('/login', async (req, res) => {
   try {
-    const { emailOrRoll, password } = req.body;
+    const { email, emailOrRoll, password } = req.body;
+    const loginEmail = (email || emailOrRoll || '').trim().toLowerCase();
 
-    if (!emailOrRoll || !password) {
-      res.status(400).json({ error: 'Please provide roll number / email and password.' });
+    if (!loginEmail || !password) {
+      res.status(400).json({ error: 'Please provide your registered email address and password.' });
       return;
     }
 
-    let user = await findUserByEmail(emailOrRoll);
-    if (!user) {
-      user = await findUserByRoll(emailOrRoll);
-    }
+    const user = await findUserByEmail(loginEmail);
 
     if (!user) {
-      res.status(401).json({ error: 'Invalid credentials. No user found with this roll number or email.' });
+      res.status(401).json({ error: 'Invalid credentials. No user found with this email address.' });
       return;
     }
 

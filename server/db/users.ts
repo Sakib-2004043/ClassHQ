@@ -50,6 +50,33 @@ export async function findUserByRoll(rollNumber: string): Promise<User | null> {
   return user ? formatUserDoc(user) : null;
 }
 
+export async function findUserByRollAndBatch(rollNumber: string, batch: string): Promise<User | null> {
+  const cleanRoll = rollNumber.trim().replace(/^0+/, '') || '0';
+  const normalizedRoll = cleanRoll.toUpperCase();
+  const normalizedBatch = normalizeBatch(batch);
+  if (isMongoConnected) {
+    try {
+      const docs = await (UserModel as any).find({
+        $or: [
+          { rollNumber: normalizedRoll },
+          { roll: normalizedRoll },
+          { rollNo: normalizedRoll },
+          { rollNumber: { $regex: new RegExp(`^0*${normalizedRoll}$`, 'i') } },
+        ]
+      }).lean();
+      const match = docs.find((d: any) => compareBatch(d.batch, normalizedBatch));
+      if (match) return formatUserDoc(match);
+    } catch (err) {
+      console.error('[DB] findUserByRollAndBatch error:', err);
+    }
+  }
+  const user = memoryUsers.find((u) => {
+    const r = (u.rollNumber || (u as any).roll || (u as any).rollNo || '').toString().trim().replace(/^0+/, '') || '0';
+    return r.toUpperCase() === normalizedRoll && compareBatch(u.batch, normalizedBatch);
+  });
+  return user ? formatUserDoc(user) : null;
+}
+
 export async function findUserById(id: string): Promise<User | null> {
   if (!id) return null;
   const trimmed = id.trim();

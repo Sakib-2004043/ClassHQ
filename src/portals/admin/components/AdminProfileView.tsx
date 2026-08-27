@@ -12,7 +12,6 @@ import {
   Loader2, 
   Shield, 
   UserCheck, 
-  Server, 
   Key, 
   Activity, 
   Globe 
@@ -96,14 +95,6 @@ export const AdminProfileView: React.FC = () => {
                 <span>•</span>
                 <span>Scope: <strong className="text-white font-bold">All Batches & Sections</strong></span>
               </p>
-            </div>
-          </div>
-
-          <div className="p-2 sm:p-2.5 rounded-xl bg-white/10 border border-white/10 backdrop-blur-md shrink-0 flex items-center gap-2.5">
-            <Server className="w-4 h-4 text-rose-400 shrink-0" />
-            <div>
-              <span className="text-[9px] font-black uppercase tracking-widest text-rose-300 block">ClassHQ Node</span>
-              <span className="text-[11px] font-bold text-white">Full Authority</span>
             </div>
           </div>
         </div>

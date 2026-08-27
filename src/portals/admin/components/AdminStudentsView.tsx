@@ -19,7 +19,8 @@ import {
   Mail,
   Phone,
   BookOpen,
-  Layers
+  Layers,
+  RotateCcw
 } from 'lucide-react';
 import { User, ApprovalStatus, AdminOverviewStats } from '../../../types';
 import { AdminEmptyState } from './AdminEmptyState';
@@ -219,28 +220,6 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
 
   return (
     <div className="max-w-4xl mx-auto space-y-2.5 sm:space-y-3.5">
-      {/* Header and Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 p-3 sm:p-4 bg-white/90 backdrop-blur-md rounded-2xl border border-rose-200/80 shadow-2xs">
-        <div className="space-y-0.5">
-          <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">Institutional Directory & Role Governance</h2>
-          <p className="text-[10px] sm:text-[11px] font-medium text-slate-500">
-            View profiles, audit student records, and promote or demote Class Captains across sections.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-          <button
-            type="button"
-            onClick={onRefresh}
-            disabled={loading}
-            className="h-8 px-2.5 sm:px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider rounded-xl transition-all border border-rose-200 flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span>Sync</span>
-          </button>
-        </div>
-      </div>
-
       {/* Quick Stat Summary Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
         <button
@@ -538,15 +517,51 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                       </div>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={() => handleApproval(st.id, 'rejected')}
-                      disabled={updatingId === st.id}
-                      className="h-7.5 sm:h-8 w-7.5 sm:w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-200 inline-flex items-center justify-center cursor-pointer"
-                      title="Revoke Approval"
-                    >
-                      <XCircle className="w-3.5 h-3.5" />
-                    </button>
+                    {st.approval === 'rejected' ? (
+                      <button
+                        type="button"
+                        onClick={() => handleApproval(st.id, 'approved')}
+                        disabled={updatingId === st.id}
+                        className="h-7.5 sm:h-8 px-2 sm:px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[10px] sm:text-[11px] uppercase tracking-wider rounded-lg transition-all shadow-2xs inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                        title="Re-Approve Rejected Student"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Approve Again</span>
+                      </button>
+                    ) : st.approval === 'pending' ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleApproval(st.id, 'approved')}
+                          disabled={updatingId === st.id}
+                          className="h-7.5 sm:h-8 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[10px] sm:text-[11px] uppercase tracking-wider rounded-lg transition-all shadow-2xs inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                          title="Approve Student"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Approve</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleApproval(st.id, 'rejected')}
+                          disabled={updatingId === st.id}
+                          className="h-7.5 sm:h-8 px-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[10px] sm:text-[11px] uppercase tracking-wider rounded-lg transition-all shadow-2xs inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                          title="Reject Student"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          <span>Reject</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleApproval(st.id, 'rejected')}
+                        disabled={updatingId === st.id}
+                        className="h-7.5 sm:h-8 w-7.5 sm:w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-200 inline-flex items-center justify-center cursor-pointer"
+                        title="Revoke Approval / Reject"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

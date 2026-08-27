@@ -4,111 +4,7 @@ import { AttendanceModel } from './models.ts';
 import { getAllUsers } from './users.ts';
 import { formatAttendanceDoc, compareBatch, compareSection } from './helpers.ts';
 
-let lastAutoMarkTime = 0;
-const AUTO_MARK_INTERVAL = 3 * 60 * 1000; // 3 minutes throttle
-
-export async function autoMarkUnmarkedStudentsAsAbsent(force = false): Promise<void> {
-  const nowTime = Date.now();
-  if (!force && nowTime - lastAutoMarkTime < AUTO_MARK_INTERVAL) {
-    return;
-  }
-  lastAutoMarkTime = nowTime;
-
-  try {
-    const allUsers = await getAllUsers();
-    const students = allUsers.filter((u) => u.role === 'student' && u.approval === 'approved');
-    if (students.length === 0) return;
-
-    // Evaluate working dates from 7 days ago up to Today
-    const now = new Date();
-    const datesToCheck: string[] = [];
-
-    for (let i = 0; i <= 7; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-      const dayOfWeek = d.getDay(); // 0 = Sun, 5 = Fri, 6 = Sat
-      // Skip weekends (Friday & Saturday)
-      if (dayOfWeek === 5 || dayOfWeek === 6) continue;
-      datesToCheck.push(d.toISOString().slice(0, 10));
-    }
-
-    const studentEmails = students.map((s) => s.email.toLowerCase()).filter(Boolean);
-    const existingKeySet = new Set<string>();
-
-    // 1. Collect from memory store
-    for (const a of memoryAttendance) {
-      if (a.email && a.date) {
-        existingKeySet.add(`${a.email.toLowerCase()}_${a.date}`);
-      }
-    }
-
-    // 2. High-speed single batch query to MongoDB
-    if (isMongoConnected && studentEmails.length > 0 && datesToCheck.length > 0) {
-      try {
-        const existingDocs = await (AttendanceModel as any)
-          .find(
-            {
-              email: { $in: studentEmails },
-              date: { $in: datesToCheck },
-            },
-            { email: 1, date: 1 }
-          )
-          .lean();
-
-        if (existingDocs) {
-          for (const doc of existingDocs) {
-            if (doc.email && doc.date) {
-              existingKeySet.add(`${doc.email.toLowerCase()}_${doc.date}`);
-            }
-          }
-        }
-      } catch (err) {
-        console.error('[DB] Batch check attendance error in autoMark:', err);
-      }
-    }
-
-    const newAbsentRecords: AttendanceRecord[] = [];
-
-    for (const dateStr of datesToCheck) {
-      for (const student of students) {
-        const studentEmail = student.email.toLowerCase();
-        const key = `${studentEmail}_${dateStr}`;
-        if (!existingKeySet.has(key)) {
-          const autoRecord: AttendanceRecord = {
-            id: `att-auto-${student.id}-${dateStr}`,
-            studentId: student.id,
-            studentName: student.fullName,
-            email: student.email,
-            batch: student.batch || student.assignedBatch || 'HSC 2026',
-            section: student.section || student.assignedSection || 'A',
-            group: student.group || 'Science',
-            date: dateStr,
-            status: 'Absent',
-            studentsNote: 'Auto Marked as Absent',
-            remarks: 'Auto Marked as Absent',
-            markedBy: {
-              id: 'system',
-              name: 'ClassHQ Auto-System',
-              role: 'admin',
-            },
-            timestamp: new Date().toISOString(),
-          };
-          newAbsentRecords.push(autoRecord);
-          existingKeySet.add(key);
-        }
-      }
-    }
-
-    if (newAbsentRecords.length > 0) {
-      await saveOrUpdateAttendanceRecords(newAbsentRecords);
-    }
-  } catch (err) {
-    console.error('[DB] Error in autoMarkUnmarkedStudentsAsAbsent:', err);
-  }
-}
-
 export async function getAttendanceByStudent(identifier: string, email?: string): Promise<AttendanceRecord[]> {
-  autoMarkUnmarkedStudentsAsAbsent().catch(console.error);
-
   const users = await getAllUsers();
   const targetUser = users.find(
     (u) =>
@@ -147,9 +43,6 @@ export async function getAttendanceBySectionAndDate(
   section: string,
   date: string
 ): Promise<AttendanceRecord[]> {
-  // Fire auto-mark in background so the request responds immediately
-  autoMarkUnmarkedStudentsAsAbsent().catch(console.error);
-
   const allUsers = await getAllUsers();
   const sectionUsers = allUsers.filter(
     (u) =>
@@ -190,8 +83,6 @@ export async function getAttendanceBySectionAndDate(
 }
 
 export async function getAllAttendance(): Promise<AttendanceRecord[]> {
-  autoMarkUnmarkedStudentsAsAbsent().catch(console.error);
-
   const allUsers = await getAllUsers();
   const userMap = new Map(allUsers.map((u) => [u.email.toLowerCase(), u]));
 

@@ -40,11 +40,17 @@ export const CaptainRosterView: React.FC<CaptainRosterViewProps> = ({
   const fetchSectionStudents = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.getAdminStudents({
-        batch: assignedBatch,
-        section: assignedSection,
+      // Use dedicated captain endpoint or scoped admin endpoint
+      const res = await api.getCaptainStudents({
         approval: statusFilter,
         search: searchTerm,
+      }).catch(async () => {
+        return await api.getAdminStudents({
+          batch: assignedBatch,
+          section: assignedSection,
+          approval: statusFilter,
+          search: searchTerm,
+        });
       });
       if (res?.students) {
         setStudents(res.students);

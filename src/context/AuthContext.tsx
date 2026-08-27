@@ -17,7 +17,7 @@ export interface PendingNotice {
 interface AuthContextType {
   user: AuthSessionPayload | null;
   loading: boolean;
-  login: (emailOrRoll: string, password: string) => Promise<{ success: boolean; isPending?: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; isPending?: boolean; error?: string }>;
   quickLogin: (role?: UserRole, email?: string) => Promise<void>;
   registerStudent: (formData: any) => Promise<{ success: boolean; message?: string; error?: string }>;
   logout: () => Promise<void>;
@@ -64,14 +64,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [refreshUser]);
 
   const login = async (
-    emailOrRoll: string,
+    email: string,
     password: string
   ): Promise<{ success: boolean; isPending?: boolean; error?: string }> => {
     try {
       setPendingNotice(null);
       setStoredToken(null);
       setUser(null);
-      const res = await api.login(emailOrRoll, password);
+      const res = await api.login(email, password);
       if (res.success && res.token && res.user) {
         setStoredToken(res.token);
         setUser(res.user);

@@ -48,47 +48,17 @@ export const AdminChartsSection: React.FC<AdminChartsSectionProps> = ({
   const [activeMetricTab, setActiveMetricTab] = useState<'attendance' | 'cohort' | 'streams'>('attendance');
 
   // Fallback / Normalized Data for Charts
-  const dailyTrend = stats?.dailyTrend || [
-    { date: '2026-08-18', formattedDate: 'Aug 18', rate: 94, present: 142, absent: 8, late: 2, total: 152 },
-    { date: '2026-08-19', formattedDate: 'Aug 19', rate: 91, present: 138, absent: 12, late: 4, total: 154 },
-    { date: '2026-08-20', formattedDate: 'Aug 20', rate: 96, present: 148, absent: 6, late: 1, total: 155 },
-    { date: '2026-08-21', formattedDate: 'Aug 21', rate: 89, present: 135, absent: 15, late: 5, total: 155 },
-    { date: '2026-08-22', formattedDate: 'Aug 22', rate: 93, present: 144, absent: 10, late: 3, total: 157 },
-    { date: '2026-08-23', formattedDate: 'Aug 23', rate: 95, present: 147, absent: 7, late: 2, total: 156 },
-    { date: '2026-08-24', formattedDate: 'Today', rate: stats?.todayInstitutionAttendanceRate || 92, present: 143, absent: 11, late: 3, total: 157 },
-  ];
-
-  const statusData = stats?.statusDistribution || [
-    { name: 'Present', count: 143, percentage: 91, color: '#10b981' },
-    { name: 'Absent', count: 11, percentage: 7, color: '#f43f5e' },
-    { name: 'Late', count: 3, percentage: 2, color: '#f59e0b' },
-  ];
-
-  const batchData = stats?.batchBreakdown || [
-    { batch: 'HSC 2024', totalStudents: 48, approvedStudents: 46, captainsCount: 4, attendanceRate: 92 },
-    { batch: 'HSC 2025', totalStudents: 56, approvedStudents: 54, captainsCount: 4, attendanceRate: 94 },
-    { batch: 'HSC 2026', totalStudents: 62, approvedStudents: 58, captainsCount: 4, attendanceRate: 89 },
-  ];
-
-  const groupData = stats?.groupBreakdown || [
-    { group: 'Science', totalStudents: 85, attendanceRate: 94 },
-    { group: 'Business Studies', totalStudents: 52, attendanceRate: 90 },
-    { group: 'Humanities', totalStudents: 29, attendanceRate: 88 },
-  ];
-
+  const dailyTrend = stats?.dailyTrend || [];
+  const statusData = stats?.statusDistribution || [];
+  const batchData = stats?.batchBreakdown || [];
+  const groupData = stats?.groupBreakdown || [];
   const sectionBreakdown = (stats?.sectionAttendanceBreakdown || []).map((sec) => ({
     name: `Sec ${sec.section}`,
     batch: sec.batch,
     rate: sec.attendanceRate,
     students: sec.totalStudents,
   }));
-
-  const complianceTiers = stats?.complianceTiers || [
-    { tier: 'Distinction (≥90%)', range: '90-100%', count: 124, percentage: 76, color: '#10b981' },
-    { tier: 'Satisfactory (75-89%)', range: '75-89%', count: 28, percentage: 17, color: '#3b82f6' },
-    { tier: 'At Risk (60-74%)', range: '60-74%', count: 8, percentage: 5, color: '#f59e0b' },
-    { tier: 'Critical (<60%)', range: '<60%', count: 3, percentage: 2, color: '#f43f5e' },
-  ];
+  const complianceTiers = stats?.complianceTiers || [];
 
   if (loading) {
     return (
@@ -254,19 +224,19 @@ export const AdminChartsSection: React.FC<AdminChartsSectionProps> = ({
               <div className="p-2 rounded-xl bg-rose-50/50">
                 <span className="text-[10px] font-bold text-slate-500 uppercase block">7-Day Average</span>
                 <span className="text-sm font-black text-slate-900">
-                  {Math.round(dailyTrend.reduce((acc, curr) => acc + curr.rate, 0) / dailyTrend.length)}%
+                  {dailyTrend.length > 0 ? Math.round(dailyTrend.reduce((acc, curr) => acc + curr.rate, 0) / dailyTrend.length) : 0}%
                 </span>
               </div>
               <div className="p-2 rounded-xl bg-emerald-50/50">
                 <span className="text-[10px] font-bold text-emerald-600 uppercase block">Peak Attendance</span>
                 <span className="text-sm font-black text-emerald-700">
-                  {Math.max(...dailyTrend.map((d) => d.rate))}%
+                  {dailyTrend.length > 0 ? Math.max(...dailyTrend.map((d) => d.rate)) : 0}%
                 </span>
               </div>
               <div className="p-2 rounded-xl bg-blue-50/50">
                 <span className="text-[10px] font-bold text-blue-600 uppercase block">Compliance Status</span>
                 <span className="text-sm font-black text-blue-700">
-                  ✓ High Standing
+                  {stats?.overallComplianceStanding || 'Active'}
                 </span>
               </div>
             </div>
@@ -287,7 +257,7 @@ export const AdminChartsSection: React.FC<AdminChartsSectionProps> = ({
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={statusData}
+                    data={statusData.length > 0 ? statusData : [{ name: 'No Data', count: 1, color: '#cbd5e1' }]}
                     cx="50%"
                     cy="50%"
                     innerRadius={55}
@@ -295,7 +265,7 @@ export const AdminChartsSection: React.FC<AdminChartsSectionProps> = ({
                     paddingAngle={4}
                     dataKey="count"
                   >
-                    {statusData.map((entry, index) => (
+                    {(statusData.length > 0 ? statusData : [{ name: 'No Data', color: '#cbd5e1' }]).map((entry: any, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color || STATUS_COLORS[entry.name] || '#cbd5e1'} />
                     ))}
                   </Pie>
@@ -308,7 +278,7 @@ export const AdminChartsSection: React.FC<AdminChartsSectionProps> = ({
                             <span className="font-black text-rose-400 block">{data.name}</span>
                             <div className="flex items-center justify-between gap-3 text-slate-200">
                               <span>Records:</span>
-                              <span className="font-bold">{data.count} ({data.percentage || Math.round((data.count / 157) * 100)}%)</span>
+                              <span className="font-bold">{data.count} ({data.percentage || 0}%)</span>
                             </div>
                           </div>
                         );
@@ -322,7 +292,7 @@ export const AdminChartsSection: React.FC<AdminChartsSectionProps> = ({
               {/* Central Stat Inside Donut */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <span className="text-2xl font-black text-slate-900 leading-none">
-                  {stats?.todayInstitutionAttendanceRate || 92}%
+                  {stats?.todayInstitutionAttendanceRate ?? 0}%
                 </span>
                 <span className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-wider">
                   Overall Present

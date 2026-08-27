@@ -120,7 +120,7 @@ export default function App() {
           <Route
             path="/student/*"
             element={
-              <ProtectedRoute allowedRoles={['student', 'captain', 'admin']}>
+              <ProtectedRoute allowedRoles={['student']}>
                 <StudentPortal />
               </ProtectedRoute>
             }
@@ -128,7 +128,7 @@ export default function App() {
           <Route
             path="/captain/*"
             element={
-              <ProtectedRoute allowedRoles={['captain', 'admin']}>
+              <ProtectedRoute allowedRoles={['captain']}>
                 <CaptainPortal />
               </ProtectedRoute>
             }
