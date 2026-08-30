@@ -5,11 +5,14 @@ import {
   AdminOverviewStats,
   AttendanceRecord,
   LeaveRequest,
+  Holiday,
   User,
   SectionCaptainInfo,
   ApprovalStatus,
   LeaveStatus,
   SystemSettings,
+  AttendanceEditOverride,
+  CaptainEditPermissionStatus,
 } from '../types';
 
 const API_BASE = '/api';
@@ -175,6 +178,29 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  getStudentHolidays: (batch?: string, section?: string) => {
+    const params = new URLSearchParams();
+    if (batch) params.append('batch', batch);
+    if (section) params.append('section', section);
+    return request<{ batch: string; section: string; holidays: Holiday[] }>(
+      `/student/holidays?${params.toString()}`
+    );
+  },
+
+  getStudentActiveHoliday: (date?: string, batch?: string, section?: string) => {
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    if (batch) params.append('batch', batch);
+    if (section) params.append('section', section);
+    return request<{
+      batch: string;
+      section: string;
+      date: string;
+      isHoliday: boolean;
+      holiday: Holiday | null;
+    }>(`/student/active-holiday?${params.toString()}`);
+  },
+
   // Captain
   getCaptainRoster: (date?: string, batch?: string, section?: string) => {
     const params = new URLSearchParams();
@@ -186,6 +212,8 @@ export const api = {
       section: string;
       date: string;
       totalEnrolled: number;
+      activeHoliday?: Holiday | null;
+      editPermission?: CaptainEditPermissionStatus | null;
       roster: Array<{
         studentId: string;
         rollNumber: string;
@@ -201,6 +229,11 @@ export const api = {
         captainsNote?: string;
       }>;
     }>(`/captain/roster?${params.toString()}`);
+  },
+
+  getCaptainEditPermission: (date: string) => {
+    const params = new URLSearchParams({ date });
+    return request<CaptainEditPermissionStatus>(`/captain/edit-permission?${params.toString()}`);
   },
 
   saveCaptainAttendance: (batch: string, section: string, date: string, records: any[]) =>
@@ -230,6 +263,33 @@ export const api = {
     if (filters.search) params.append('search', filters.search);
     return request<{ total: number; students: User[] }>(`/captain/students?${params.toString()}`);
   },
+
+  getCaptainHolidays: (batch?: string, section?: string) => {
+    const params = new URLSearchParams();
+    if (batch) params.append('batch', batch);
+    if (section) params.append('section', section);
+    return request<{ batch: string; section: string; holidays: Holiday[] }>(
+      `/captain/holidays?${params.toString()}`
+    );
+  },
+
+  createCaptainHoliday: (data: {
+    title: string;
+    startDate: string;
+    endDate: string;
+    description?: string;
+    batch?: string;
+    section?: string;
+  }) =>
+    request<{ success: boolean; message: string; holiday: Holiday }>('/captain/holidays', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  deleteCaptainHoliday: (id: string) =>
+    request<{ success: boolean; message: string }>(`/captain/holidays/${id}`, {
+      method: 'DELETE',
+    }),
 
   // Admin
   getAdminStats: () => request<AdminOverviewStats>('/admin/overview-stats'),
@@ -284,6 +344,40 @@ export const api = {
     request<{ success: boolean; message: string; leave: LeaveRequest }>(`/admin/leaves/${id}/review`, {
       method: 'PATCH',
       body: JSON.stringify({ status, reviewNote }),
+    }),
+
+  // Attendance Edit Overrides / Access Grants
+  getAdminOverrides: (filters?: { batch?: string; section?: string; captainId?: string; status?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.batch) params.append('batch', filters.batch);
+    if (filters?.section) params.append('section', filters.section);
+    if (filters?.captainId) params.append('captainId', filters.captainId);
+    if (filters?.status) params.append('status', filters.status);
+    return request<{ total: number; overrides: AttendanceEditOverride[] }>(`/admin/overrides?${params.toString()}`);
+  },
+
+  createAdminOverride: (data: {
+    captainId?: string;
+    batch: string;
+    section: string;
+    targetDate: string;
+    durationMinutes: number;
+    reason?: string;
+  }) =>
+    request<{ success: boolean; message: string; override: AttendanceEditOverride }>('/admin/overrides', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  revokeAdminOverride: (id: string) =>
+    request<{ success: boolean; message: string; override: AttendanceEditOverride }>(`/admin/overrides/${id}/revoke`, {
+      method: 'PATCH',
+    }),
+
+  extendAdminOverride: (id: string, additionalMinutes: number) =>
+    request<{ success: boolean; message: string; override: AttendanceEditOverride }>(`/admin/overrides/${id}/extend`, {
+      method: 'PATCH',
+      body: JSON.stringify({ additionalMinutes }),
     }),
 
   // Settings

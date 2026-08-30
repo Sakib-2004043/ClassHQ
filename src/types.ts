@@ -243,3 +243,62 @@ export interface SystemSettings {
   updatedBy?: string;
   updatedAt?: string;
 }
+
+export interface Holiday {
+  id: string;
+  title: string;
+  batch: HSCBatch;
+  section: Section;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  description?: string;
+  createdBy: {
+    id: string;
+    name: string;
+    email: string;
+    rollNumber?: string;
+    role: UserRole;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AttendanceEditOverride {
+  id: string;
+  captainId: string;
+  captainName: string;
+  captainEmail: string;
+  captainRoll?: string;
+  batch: HSCBatch;
+  section: Section;
+  targetDate: string; // YYYY-MM-DD
+  durationMinutes: number;
+  grantedAt: string; // ISO date
+  expiresAt: string; // ISO date
+  grantedBy: {
+    id: string;
+    name: string;
+    email: string;
+    role?: UserRole;
+  };
+  reason?: string;
+  status: 'active' | 'expired' | 'revoked';
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CaptainEditPermissionStatus {
+  allowed: boolean;
+  reason: string;
+  isSameDay: boolean;
+  isWithinTimeWindow: boolean;
+  activeOverride: AttendanceEditOverride | null;
+  activeGrants?: AttendanceEditOverride[];
+  serverTime: string;
+  serverDate: string;
+  timeWindow: {
+    start: string; // e.g. "12:05 AM"
+    end: string;   // e.g. "11:55 PM"
+  };
+  remainingSeconds?: number;
+}

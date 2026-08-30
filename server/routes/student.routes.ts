@@ -9,6 +9,8 @@ import {
   findUserById,
   findUserByEmail,
   getSystemSettingsDB,
+  getHolidayForDate,
+  getHolidaysBySection,
 } from '../db/index.ts';
 import { requireAuth, requireRoles, authMiddleware, AuthenticatedRequest } from '../auth.ts';
 import { isTimeWithinWindow } from '../utils/timeWindow.ts';
@@ -146,6 +148,17 @@ studentRouter.post('/self-attendance', requireAuth, async (req: AuthenticatedReq
     if (approvedLeaveForDate) {
       res.status(400).json({
         error: `Attendance for ${dateStr} is locked because your leave application has been officially approved by section captain. You cannot edit or mark yourself present/absent.`,
+      });
+      return;
+    }
+
+    // Check if there is an active Holiday marked by Class Captain for this date and section/batch
+    const userBatch = user.batch || user.assignedBatch || 'HSC 2026';
+    const userSection = user.section || user.assignedSection || 'A';
+    const activeHoliday = await getHolidayForDate(userBatch, userSection, dateStr);
+    if (activeHoliday) {
+      res.status(400).json({
+        error: `Attendance self-reporting is closed because '${activeHoliday.title}' (from ${activeHoliday.startDate} to ${activeHoliday.endDate}) is marked for your section by Class Captain.`,
       });
       return;
     }
@@ -381,5 +394,38 @@ studentRouter.patch('/leave-requests/:id', requireAuth, async (req: Authenticate
     });
   } catch (err: any) {
     res.status(400).json({ error: err?.message || 'Error updating leave request.' });
+  }
+});
+
+// Student Section Holidays
+studentRouter.get('/holidays', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userBatch = req.user?.batch || req.user?.assignedBatch || (req.query.batch as string) || 'HSC 2026';
+    const userSection = req.user?.section || req.user?.assignedSection || (req.query.section as string) || 'A';
+
+    const holidays = await getHolidaysBySection(userBatch, userSection);
+    res.json({ batch: userBatch, section: userSection, holidays });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Error fetching section holidays.' });
+  }
+});
+
+// Check Active Holiday for a specific date
+studentRouter.get('/active-holiday', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userBatch = req.user?.batch || req.user?.assignedBatch || (req.query.batch as string) || 'HSC 2026';
+    const userSection = req.user?.section || req.user?.assignedSection || (req.query.section as string) || 'A';
+    const dateStr = (req.query.date as string) || new Date().toISOString().split('T')[0];
+
+    const holiday = await getHolidayForDate(userBatch, userSection, dateStr);
+    res.json({
+      batch: userBatch,
+      section: userSection,
+      date: dateStr,
+      isHoliday: Boolean(holiday),
+      holiday: holiday || null,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Error checking active holiday.' });
   }
 });

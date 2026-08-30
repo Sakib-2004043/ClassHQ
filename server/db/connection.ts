@@ -1,11 +1,13 @@
 import mongoose from 'mongoose';
-import { User, AttendanceRecord, LeaveRequest } from '../../src/types.ts';
-import { UserModel, AttendanceModel } from './models.ts';
+import { User, AttendanceRecord, LeaveRequest, Holiday, AttendanceEditOverride } from '../../src/types.ts';
+import { UserModel, AttendanceModel, HolidayModel, AttendanceEditOverrideModel } from './models.ts';
 
 // In-Memory store initialized for dynamic users & unified attendance records
 export const memoryUsers: User[] = [];
 export const memoryAttendance: any[] = [];
 export const memoryLeaves: LeaveRequest[] = [];
+export const memoryHolidays: Holiday[] = [];
+export const memoryOverrides: AttendanceEditOverride[] = [];
 
 export let isMongoConnected = false;
 export let mongoConnectionError: string | null = null;

@@ -14,6 +14,10 @@ import {
   updateSystemSettingsDB,
   compareBatch,
   compareSection,
+  getAllAttendanceOverrides,
+  createAttendanceOverride,
+  revokeAttendanceOverride,
+  extendAttendanceOverride,
 } from '../db/index.ts';
 import {
   authMiddleware,
@@ -652,5 +656,133 @@ adminRouter.patch('/leaves/:id/review', requireRoles(['admin', 'captain']), asyn
     });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Error reviewing leave application.' });
+  }
+});
+
+// ==========================================
+// Roll-Call Attendance Edit Overrides / Access Grants (Admin Only)
+// ==========================================
+
+// List all override grants
+adminRouter.get('/overrides', requireRoles(['admin']), async (req, res: Response) => {
+  try {
+    const { batch, section, captainId, status } = req.query;
+    const overrides = await getAllAttendanceOverrides({
+      batch: batch as string,
+      section: section as string,
+      captainId: captainId as string,
+      status: status as string,
+    });
+
+    res.json({
+      total: overrides.length,
+      overrides,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Error fetching attendance edit overrides.' });
+  }
+});
+
+// Grant temporary attendance edit access to a Captain
+adminRouter.post('/overrides', requireRoles(['admin']), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { captainId, batch, section, targetDate, durationMinutes, reason } = req.body;
+
+    if (!batch || !section || !targetDate) {
+      res.status(400).json({ error: 'batch, section, and targetDate (YYYY-MM-DD) are required.' });
+      return;
+    }
+
+    const duration = Number(durationMinutes) || 60;
+    if (duration <= 0) {
+      res.status(400).json({ error: 'durationMinutes must be greater than 0.' });
+      return;
+    }
+
+    let captainName = 'All Section Captains';
+    let captainEmail = 'all';
+    let captainRoll = '';
+    let targetCaptainId = captainId || 'all';
+
+    if (captainId && captainId !== 'all') {
+      const user = await findUserById(captainId);
+      if (user) {
+        captainName = user.fullName;
+        captainEmail = user.email;
+        captainRoll = user.rollNumber;
+        targetCaptainId = user.id;
+      }
+    }
+
+    const grantedBy = {
+      id: req.user!.userId,
+      name: req.user!.fullName,
+      email: req.user!.email,
+      role: req.user!.role,
+    };
+
+    const override = await createAttendanceOverride({
+      captainId: targetCaptainId,
+      captainName,
+      captainEmail,
+      captainRoll,
+      batch: batch as HSCBatch,
+      section: section as Section,
+      targetDate,
+      durationMinutes: duration,
+      reason,
+      grantedBy,
+    });
+
+    res.json({
+      success: true,
+      message: `Granted ${duration} minutes edit access to ${captainName} for ${targetDate} attendance.`,
+      override,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Error creating attendance edit grant.' });
+  }
+});
+
+// Revoke an override early
+adminRouter.patch('/overrides/:id/revoke', requireRoles(['admin']), async (req, res: Response) => {
+  try {
+    const { id } = req.params;
+    const revoked = await revokeAttendanceOverride(id);
+    if (!revoked) {
+      res.status(404).json({ error: 'Override grant not found.' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: `Override access for ${revoked.captainName} revoked.`,
+      override: revoked,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Error revoking override grant.' });
+  }
+});
+
+// Extend an override duration
+adminRouter.patch('/overrides/:id/extend', requireRoles(['admin']), async (req, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { additionalMinutes } = req.body;
+    const mins = Number(additionalMinutes) || 15;
+
+    const extended = await extendAttendanceOverride(id, mins);
+    if (!extended) {
+      res.status(404).json({ error: 'Override grant not found.' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: `Extended access by ${mins} minutes for ${extended.captainName}.`,
+      override: extended,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Error extending override grant.' });
   }
 });

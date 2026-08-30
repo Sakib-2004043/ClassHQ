@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   X, 
   ShieldAlert, 
@@ -18,10 +18,13 @@ import {
   RefreshCw,
   Award,
   UserCheck,
-  UserX
+  UserX,
+  Download,
+  CalendarRange
 } from 'lucide-react';
 import { User, ApprovalStatus, UserProfileDetail } from '../../../types';
 import { api } from '../../../lib/api';
+import { generateMonthlyAttendancePDF } from '../../../lib/pdfReport';
 
 interface CaptainUserProfileModalProps {
   user: User | null;
@@ -75,6 +78,67 @@ export const CaptainUserProfileModal: React.FC<CaptainUserProfileModalProps> = (
   const attendanceStats = profileData?.attendanceStats;
   const attendanceRecords = profileData?.attendanceRecords || [];
   const leaveRequests = profileData?.leaveRequests || [];
+
+  // Mandatory Month Selection PDF Modal States
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [pdfMonth, setPdfMonth] = useState<string>('');
+  const [pdfValidationError, setPdfValidationError] = useState<string | null>(null);
+
+  const availableMonths = useMemo(() => {
+    const monthsSet = new Set<string>();
+    (attendanceRecords || []).forEach((r) => {
+      if (r.date && r.date.length >= 7) {
+        monthsSet.add(r.date.substring(0, 7));
+      }
+    });
+    (leaveRequests || []).forEach((lv) => {
+      if (lv.startDate && lv.startDate.length >= 7) {
+        monthsSet.add(lv.startDate.substring(0, 7));
+      }
+    });
+    // Ensure current month is available
+    const nowStr = new Date().toISOString().substring(0, 7);
+    monthsSet.add(nowStr);
+
+    return Array.from(monthsSet).sort().reverse();
+  }, [attendanceRecords, leaveRequests]);
+
+  const formatMonthTitle = (monthStr: string) => {
+    try {
+      const [year, month] = monthStr.split('-');
+      const dateObj = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
+      return dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    } catch {
+      return monthStr;
+    }
+  };
+
+  const handleOpenPdfModal = () => {
+    const defaultMonth = availableMonths[0] || new Date().toISOString().substring(0, 7);
+    setPdfMonth(defaultMonth);
+    setPdfValidationError(null);
+    setIsPdfModalOpen(true);
+  };
+
+  const handleExecutePdfDownload = () => {
+    if (!pdfMonth || pdfMonth.trim() === '' || pdfMonth === 'All') {
+      setPdfValidationError('Month selection is mandatory to generate the student PDF report.');
+      return;
+    }
+
+    try {
+      generateMonthlyAttendancePDF({
+        user: currentUser,
+        selectedMonth: pdfMonth,
+        records: attendanceRecords || [],
+        leaves: leaveRequests || [],
+      });
+      setIsPdfModalOpen(false);
+      setPdfValidationError(null);
+    } catch (err: any) {
+      setPdfValidationError(err.message || 'Failed to generate student PDF report.');
+    }
+  };
 
   const handleApprovalChange = async (newApproval: ApprovalStatus) => {
     setActionLoading(true);
@@ -191,8 +255,18 @@ export const CaptainUserProfileModal: React.FC<CaptainUserProfileModalProps> = (
               </div>
             </div>
 
-            {/* Quick Action Role Buttons */}
+            {/* Quick Action Role Buttons & PDF Download */}
             <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleOpenPdfModal}
+                className="px-2.5 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider transition-all flex items-center gap-1 shadow-2xs cursor-pointer"
+                title="Download Monthly Attendance PDF"
+              >
+                <Download className="w-3 h-3 shrink-0" />
+                <span>Monthly PDF</span>
+              </button>
+
               {currentUser.approval === 'pending' && (
                 <div className="flex items-center gap-1.5">
                   <button
@@ -408,9 +482,19 @@ export const CaptainUserProfileModal: React.FC<CaptainUserProfileModalProps> = (
 
                   {/* Attendance Log Table */}
                   <div className="p-3 sm:p-4 rounded-xl bg-white border border-sky-200/80 space-y-2 shadow-2xs">
-                    <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-sky-700">
-                      Chronological Roll Call Ledger
-                    </h4>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-1 border-b border-sky-100">
+                      <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-sky-700">
+                        Chronological Roll Call Ledger
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={handleOpenPdfModal}
+                        className="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 rounded-lg text-[10px] font-extrabold uppercase tracking-wider transition-all flex items-center gap-1 self-start sm:self-auto shadow-2xs cursor-pointer"
+                      >
+                        <Download className="w-3 h-3 text-sky-600 shrink-0" />
+                        <span>Download Monthly PDF</span>
+                      </button>
+                    </div>
 
                     {attendanceRecords.length > 0 ? (
                       <div className="space-y-1.5">
@@ -523,15 +607,109 @@ export const CaptainUserProfileModal: React.FC<CaptainUserProfileModalProps> = (
           <span className="text-[10px] font-bold text-slate-500">
             ClassHQ Institutional Records
           </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider transition-all shadow-2xs cursor-pointer"
-          >
-            Close Dossier
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleOpenPdfModal}
+              className="px-3 py-1.5 bg-sky-100 hover:bg-sky-200 text-sky-800 border border-sky-300/80 rounded-lg text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-sky-700 shrink-0" />
+              <span>Download Monthly PDF</span>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider transition-all shadow-2xs cursor-pointer"
+            >
+              Close Dossier
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Mandatory Month Selection PDF Modal for Student Profile */}
+      {isPdfModalOpen && (
+        <div 
+          className="fixed inset-0 z-[120] bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div 
+            className="bg-white rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl border border-sky-200 space-y-4 animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-sky-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center">
+                  <Download className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Download Student Attendance PDF</h3>
+                  <p className="text-[10px] font-semibold text-sky-700">
+                    {currentUser.fullName} (Roll: {currentUser.rollNumber || 'N/A'})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPdfModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Select the academic month to compile and generate the official monthly attendance PDF ledger for this student ({currentUser.batch || 'HSC'} Sec {currentUser.section || 'A'}).
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 block">
+                Academic Month <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={pdfMonth}
+                onChange={(e) => {
+                  setPdfMonth(e.target.value);
+                  setPdfValidationError(null);
+                }}
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-hidden focus:border-sky-500 cursor-pointer"
+              >
+                <option value="">-- Choose Month --</option>
+                {availableMonths.map((m) => (
+                  <option key={m} value={m}>
+                    {formatMonthTitle(m)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {pdfValidationError && (
+              <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+                <span>{pdfValidationError}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsPdfModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleExecutePdfDownload}
+                className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Generate PDF</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -2,11 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
-import { AttendanceStatus, LeaveRequest, CaptainSectionStats, User, ApprovalStatus, AttendanceRecord, LeaveType } from '../../types';
+import { AttendanceStatus, LeaveRequest, CaptainSectionStats, User, ApprovalStatus, AttendanceRecord, LeaveType, Holiday, CaptainEditPermissionStatus } from '../../types';
 import { CaptainNavbar } from './components/CaptainNavbar';
 import { CaptainRollCallView, RosterItem } from './components/CaptainRollCallView';
 import { CaptainRosterView } from './components/CaptainRosterView';
 import { CaptainLeavesView } from './components/CaptainLeavesView';
+import { CaptainHolidaysView } from './components/CaptainHolidaysView';
 import { CaptainMyProfileView } from './components/CaptainMyProfileView';
 import { CaptainSelfAttendanceView } from './components/CaptainSelfAttendanceView';
 import { CaptainUserProfileModal } from './components/CaptainUserProfileModal';
@@ -37,6 +38,8 @@ export const CaptainPortal: React.FC = () => {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [personalRecords, setPersonalRecords] = useState<AttendanceRecord[]>([]);
   const [personalLeaves, setPersonalLeaves] = useState<LeaveRequest[]>([]);
+  const [activeHoliday, setActiveHoliday] = useState<Holiday | null>(null);
+  const [editPermission, setEditPermission] = useState<CaptainEditPermissionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
@@ -74,6 +77,11 @@ export const CaptainPortal: React.FC = () => {
             captainsNote: r.captainsNote || '',
           }))
         );
+      }
+
+      if (rosterRes) {
+        setActiveHoliday(rosterRes.activeHoliday || null);
+        setEditPermission(rosterRes.editPermission || null);
       }
 
       if (statsRes) setStats(statsRes);
@@ -234,6 +242,8 @@ export const CaptainPortal: React.FC = () => {
                   saveSuccess={saveSuccess}
                   saveError={saveError}
                   loading={loading}
+                  activeHoliday={activeHoliday}
+                  editPermission={editPermission}
                 />
               }
             />
@@ -245,6 +255,16 @@ export const CaptainPortal: React.FC = () => {
                   leaves={personalLeaves}
                   onRefreshData={fetchCaptainData}
                   loading={loading}
+                />
+              }
+            />
+            <Route
+              path="/holidays"
+              element={
+                <CaptainHolidaysView
+                  assignedBatch={assignedBatch}
+                  assignedSection={assignedSection}
+                  onRefreshData={fetchCaptainData}
                 />
               }
             />

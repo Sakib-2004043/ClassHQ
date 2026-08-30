@@ -12,6 +12,11 @@ import {
   getAllLeaveRequests,
   compareBatch,
   compareSection,
+  getHolidaysBySection,
+  getHolidayForDate,
+  createHoliday,
+  deleteHoliday,
+  checkCaptainEditPermission,
 } from '../db/index.ts';
 import {
   authMiddleware,
@@ -22,6 +27,7 @@ import {
   AttendanceRecord,
   AttendanceStatus,
   LeaveRequest,
+  Holiday,
   HSCBatch,
   Section,
 } from '../../src/types.ts';
@@ -55,9 +61,10 @@ captainRouter.get('/roster', async (req: AuthenticatedRequest, res: Response) =>
       );
     });
 
-    const [existingRecords, sectionLeaves] = await Promise.all([
+    const [existingRecords, sectionLeaves, activeHoliday] = await Promise.all([
       getAttendanceBySectionAndDate(batch, section, date),
       getLeavesBySection(batch, section),
+      getHolidayForDate(batch, section, date),
     ]);
 
     const recordMap = new Map<string, AttendanceRecord>();
@@ -132,15 +139,31 @@ captainRouter.get('/roster', async (req: AuthenticatedRequest, res: Response) =>
       };
     });
 
+    const editPermission = await checkCaptainEditPermission(req.user!, date);
+
     res.json({
       batch,
       section,
       date,
       totalEnrolled: sectionStudents.length,
+      activeHoliday,
+      editPermission,
       roster,
     });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Error fetching captain section roster.' });
+  }
+});
+
+// Check Edit Permission for Selected Date
+captainRouter.get('/edit-permission', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { date } = req.query;
+    const targetDate = (date as string) || new Date().toISOString().split('T')[0];
+    const permission = await checkCaptainEditPermission(req.user!, targetDate);
+    res.json(permission);
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Error checking edit permission.' });
   }
 });
 
@@ -156,6 +179,26 @@ captainRouter.post('/attendance', async (req: AuthenticatedRequest, res: Respons
 
     if (!batch || !section || !date || !Array.isArray(records)) {
       res.status(400).json({ error: 'batch, section, date, and records array are required.' });
+      return;
+    }
+
+    // Check holiday restriction
+    const activeHoliday = await getHolidayForDate(batch, section, date);
+    if (activeHoliday) {
+      res.status(400).json({
+        error: `Roll call is locked for ${date}. Academic holiday in effect: ${activeHoliday.title} (${activeHoliday.startDate} to ${activeHoliday.endDate}).`,
+        activeHoliday,
+      });
+      return;
+    }
+
+    // Check same-day window & admin override permission
+    const editPermission = await checkCaptainEditPermission(req.user!, date);
+    if (!editPermission.allowed) {
+      res.status(403).json({
+        error: editPermission.reason,
+        permission: editPermission,
+      });
       return;
     }
 
@@ -523,6 +566,91 @@ captainRouter.patch('/leaves/:id/review', async (req: AuthenticatedRequest, res:
     });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Error reviewing leave application.' });
+  }
+});
+
+// Section Holidays List (For Captain)
+captainRouter.get('/holidays', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userSection = req.user?.assignedSection || req.user?.section;
+    const userBatch = req.user?.assignedBatch || req.user?.batch;
+    const section = (req.query.section as string) || userSection || 'A';
+    const batch = (req.query.batch as string) || userBatch || 'HSC 2026';
+
+    const holidays = await getHolidaysBySection(batch, section);
+    res.json({ batch, section, holidays });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Error fetching section holidays.' });
+  }
+});
+
+// Mark / Set Holiday (Captain setting holiday for their batch and section)
+captainRouter.post('/holidays', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { title, startDate, endDate, description } = req.body;
+    const batch = (req.user?.assignedBatch || req.user?.batch || req.body.batch || 'HSC 2026') as HSCBatch;
+    const section = (req.user?.assignedSection || req.user?.section || req.body.section || 'A') as Section;
+
+    if (!title || !startDate || !endDate) {
+      res.status(400).json({ error: 'Holiday title, start date (From), and end date (To) are required.' });
+      return;
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+      res.status(400).json({ error: 'Dates must be in standard YYYY-MM-DD format.' });
+      return;
+    }
+
+    if (endDate < startDate) {
+      res.status(400).json({ error: 'End Date (To date) cannot be before Start Date (From date).' });
+      return;
+    }
+
+    const holiday = await createHoliday({
+      title: title.trim(),
+      batch,
+      section,
+      startDate,
+      endDate,
+      description: (description || '').trim(),
+      createdBy: {
+        id: req.user!.userId,
+        name: req.user!.fullName,
+        email: req.user!.email,
+        rollNumber: req.user!.rollNumber,
+        role: req.user!.role,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Holiday '${holiday.title}' from ${holiday.startDate} to ${holiday.endDate} has been marked for Section ${section} (${batch}). Attendance marking is closed during this period.`,
+      holiday,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Error marking section holiday.' });
+  }
+});
+
+// Delete / Remove Holiday Schedule
+captainRouter.delete('/holidays/:id', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const deleted = await deleteHoliday(id, {
+      id: req.user!.userId,
+      role: req.user!.role,
+      batch: req.user?.assignedBatch || req.user?.batch,
+      section: req.user?.assignedSection || req.user?.section,
+    });
+
+    if (!deleted) {
+      res.status(404).json({ error: 'Holiday not found or already deleted.' });
+      return;
+    }
+
+    res.json({ success: true, message: 'Holiday schedule has been removed successfully.' });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Error deleting holiday.' });
   }
 });
 

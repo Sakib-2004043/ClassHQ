@@ -6,3 +6,5 @@ export * from './users.ts';
 export * from './attendance.ts';
 export * from './leaves.ts';
 export * from './settings.ts';
+export * from './holidays.ts';
+export * from './overrides.ts';

@@ -9,6 +9,7 @@ import { AdminPendingStudentsView } from './components/AdminPendingStudentsView'
 import { AdminAnalyticsView } from './components/AdminAnalyticsView';
 import { AdminProfileView } from './components/AdminProfileView';
 import { AdminSettingsView } from './components/AdminSettingsView';
+import { AdminOverridesView } from './components/AdminOverridesView';
 
 export const AdminPortal: React.FC = () => {
   const { user } = useAuth();
@@ -132,6 +133,10 @@ export const AdminPortal: React.FC = () => {
           <Route
             path="/profile"
             element={<AdminProfileView />}
+          />
+          <Route
+            path="/overrides"
+            element={<AdminOverridesView />}
           />
           <Route
             path="/settings"

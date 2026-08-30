@@ -24,9 +24,12 @@ import {
   HelpCircle,
   Edit3,
   Lock,
-  UserCheck
+  UserCheck,
+  Palmtree,
+  Sun,
+  CalendarRange
 } from 'lucide-react';
-import { AttendanceRecord, AttendanceStatus, LeaveRequest, LeaveType } from '../../../types';
+import { AttendanceRecord, AttendanceStatus, LeaveRequest, LeaveType, Holiday } from '../../../types';
 import { CaptainEmptyState } from './CaptainEmptyState';
 import { useAuth } from '../../../context/AuthContext';
 import { generateMonthlyAttendancePDF } from '../../../lib/pdfReport';
@@ -248,9 +251,44 @@ export const CaptainSelfAttendanceView: React.FC<CaptainSelfAttendanceViewProps>
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // Active Holiday State for Target Day
+  const [activeHoliday, setActiveHoliday] = useState<Holiday | null>(null);
+  const [loadingHoliday, setLoadingHoliday] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const checkHoliday = async () => {
+      setLoadingHoliday(true);
+      try {
+        const batch = user?.assignedBatch || user?.batch;
+        const section = user?.assignedSection || user?.section;
+        const res = await api.getStudentActiveHoliday(targetDayIso, batch, section);
+        if (isMounted) {
+          setActiveHoliday(res?.holiday || null);
+        }
+      } catch {
+        if (isMounted) setActiveHoliday(null);
+      } finally {
+        if (isMounted) setLoadingHoliday(false);
+      }
+    };
+    checkHoliday();
+    return () => {
+      isMounted = false;
+    };
+  }, [targetDayIso, user?.assignedBatch, user?.batch, user?.assignedSection, user?.section]);
+
   // Direct 1-Click Status Switch (e.g. Present -> Absent or Absent -> Present)
   const handleDirectStatusSwitch = async (newStatus: 'present' | 'absent', optionalReason?: string) => {
     setActionFeedback(null);
+
+    if (activeHoliday) {
+      setActionFeedback({
+        type: 'error',
+        message: `Attendance self-reporting is closed because '${activeHoliday.title}' (from ${activeHoliday.startDate} to ${activeHoliday.endDate}) is marked as holiday.`,
+      });
+      return;
+    }
 
     if (isLeaveApprovedForDay) {
       setActionFeedback({
@@ -299,6 +337,14 @@ export const CaptainSelfAttendanceView: React.FC<CaptainSelfAttendanceViewProps>
   const handleNextDaySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setActionFeedback(null);
+
+    if (activeHoliday) {
+      setActionFeedback({
+        type: 'error',
+        message: `Attendance self-reporting is closed because '${activeHoliday.title}' (from ${activeHoliday.startDate} to ${activeHoliday.endDate}) is marked as holiday.`,
+      });
+      return;
+    }
 
     if (isLeaveApprovedForDay) {
       setActionFeedback({
@@ -635,29 +681,64 @@ export const CaptainSelfAttendanceView: React.FC<CaptainSelfAttendanceViewProps>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 pb-3 border-b border-slate-800/80">
             <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-1">
-                  <UserCheck className="w-3 h-3 text-sky-400" />
-                  Captain Self-Attendance
+                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1 ${
+                  activeHoliday
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    : 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                }`}>
+                  {activeHoliday ? (
+                    <>
+                      <Palmtree className="w-3 h-3 text-amber-400" />
+                      Academic Holiday
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck className="w-3 h-3 text-sky-400" />
+                      Captain Self-Attendance
+                    </>
+                  )}
                 </span>
-                <span className="text-[11px] font-mono text-slate-400 font-semibold">
-                  Window: {settings.startTime} – {settings.endTime}
-                </span>
+                {!activeHoliday && (
+                  <span className="text-[11px] font-mono text-slate-400 font-semibold">
+                    Window: {settings.startTime} – {settings.endTime}
+                  </span>
+                )}
               </div>
               <h2 className="text-sm sm:text-base font-bold tracking-tight text-white flex items-center gap-1.5 flex-wrap">
-                <span>{targetDayLabel}'s Status:</span> <span className="text-sky-400 font-mono">{targetDayFormatted}</span>
+                <span>{targetDayLabel}'s Status:</span>{' '}
+                <span className={`${activeHoliday ? 'text-amber-300' : 'text-sky-400'} font-mono`}>
+                  {targetDayFormatted}
+                </span>
               </h2>
               <p className="text-[11px] text-slate-300/90 font-normal leading-tight">
-                As a student, mark your personal attendance choice [Present/Absent] or submit a leave request.
+                {activeHoliday
+                  ? 'Official academic holiday observed for your section. Regular roll-call is suspended and no attendance submission is required.'
+                  : 'As a student, mark your personal attendance choice [Present/Absent] or submit a leave request.'}
               </p>
-              <div className="pt-0.5 flex items-center gap-1.5 text-[10px] font-medium text-amber-300/90 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 max-w-fit leading-tight">
-                <AlertCircle className="w-3 h-3 text-amber-400 shrink-0" />
-                <span>Mark Present or Leave before {settings.endTime}, or status defaults to <strong>ABSENT</strong> for {targetDayIso}.</span>
-              </div>
+              {!activeHoliday ? (
+                <div className="pt-0.5 flex items-center gap-1.5 text-[10px] font-medium text-amber-300/90 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 max-w-fit leading-tight">
+                  <AlertCircle className="w-3 h-3 text-amber-400 shrink-0" />
+                  <span>
+                    Mark Present or Leave before {settings.endTime}, or status defaults to <strong>ABSENT</strong> for{' '}
+                    {targetDayIso}.
+                  </span>
+                </div>
+              ) : (
+                <div className="pt-0.5 flex items-center gap-1.5 text-[10px] font-medium text-emerald-300/90 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20 max-w-fit leading-tight">
+                  <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
+                  <span>No absence penalty or fine applies during designated holidays.</span>
+                </div>
+              )}
             </div>
 
             {/* Window Status Badge */}
             <div className="shrink-0 flex items-center gap-2 self-start md:self-center">
-              {isTimeWindowOpen ? (
+              {activeHoliday ? (
+                <div className="px-2.5 py-1 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-200 text-[11px] font-bold flex items-center gap-1.5 shadow-xs">
+                  <Palmtree className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Holiday (Attendance Closed)</span>
+                </div>
+              ) : isTimeWindowOpen ? (
                 <div className="px-2.5 py-1 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 shadow-xs animate-pulse">
                   <Clock className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Window Active ({settings.startTime} – {settings.endTime})</span>
@@ -690,7 +771,62 @@ export const CaptainSelfAttendanceView: React.FC<CaptainSelfAttendanceViewProps>
           )}
 
           {/* Action Submission Form or Confirmed Status Summary Card */}
-          {!isTimeWindowOpen ? (
+          {activeHoliday ? (
+            /* Official Holiday Active Card */
+            <div className="p-3.5 sm:p-5 rounded-2xl bg-gradient-to-br from-amber-950/90 via-orange-950/80 to-slate-900 border-2 border-amber-400/80 text-white space-y-3 shadow-xl shadow-amber-950/40 overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/25 text-amber-300 border border-amber-400/60 flex items-center justify-center shrink-0 shadow-xs">
+                    <Palmtree className="w-5 h-5 text-amber-300 animate-bounce" />
+                  </div>
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-amber-950 border border-amber-300 flex items-center gap-1">
+                        <Sun className="w-3 h-3 text-amber-950 shrink-0" />
+                        OFFICIAL ACADEMIC HOLIDAY
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-white/10 text-amber-100 border border-amber-300/30">
+                        Present Giving Closed
+                      </span>
+                    </div>
+                    <h3 className="text-base sm:text-lg font-black text-white leading-tight break-words">
+                      {activeHoliday.title}
+                    </h3>
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-200 flex-wrap">
+                      <CalendarRange className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                      <span className="break-words">
+                        From <strong className="text-white font-mono">{activeHoliday.startDate}</strong> to <strong className="text-white font-mono">{activeHoliday.endDate}</strong>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="px-3 py-1.5 rounded-xl bg-amber-900/70 border border-amber-400/50 text-amber-200 text-xs font-bold flex items-center gap-1.5 shrink-0 self-start sm:self-center shadow-xs">
+                  <Lock className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                  <span>Attendance Closed</span>
+                </div>
+              </div>
+
+              {activeHoliday.description && (
+                <p className="text-xs text-amber-100/90 italic bg-black/30 p-2.5 rounded-xl border border-amber-400/20 leading-relaxed break-words">
+                  "{activeHoliday.description}"
+                </p>
+              )}
+
+              <div className="pt-2 border-t border-amber-400/20 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] text-amber-200/90">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                  <span className="truncate">
+                    Holiday Marked by: <strong className="text-white">{activeHoliday.createdBy?.name || 'Class Captain'}</strong>
+                    {activeHoliday.createdBy?.rollNumber ? ` (Roll: ${activeHoliday.createdBy.rollNumber})` : ''}
+                  </span>
+                </div>
+                <span className="text-[10px] text-amber-300/80 font-mono shrink-0">
+                  Sec {activeHoliday.section} • {activeHoliday.batch}
+                </span>
+              </div>
+            </div>
+          ) : !isTimeWindowOpen ? (
             <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-800/40 text-amber-200 text-[11px] font-medium space-y-1.5 leading-snug">
               <div className="flex items-center gap-1.5 font-bold text-amber-300">
                 <Clock className="w-3.5 h-3.5 text-amber-400" />
