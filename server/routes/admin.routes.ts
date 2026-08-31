@@ -19,6 +19,7 @@ import {
   revokeAttendanceOverride,
   extendAttendanceOverride,
 } from '../db/index.ts';
+import { getZonedDateString } from '../utils/dateUtils.ts';
 import {
   authMiddleware,
   requireRoles,
@@ -73,7 +74,7 @@ adminRouter.get('/overview-stats', requireRoles(['admin']), async (req, res: Res
     const pendingStudentApprovals = allUsers.filter((u) => u.approval === 'pending').length;
     const pendingLeaveApprovals = allLeaves.filter((l) => l.status === 'Pending').length;
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getZonedDateString();
     const todayLogs = allAttendance.filter((a) => a.date === today);
     const todayPresentCount = todayLogs.filter((a) => {
       const s = String(a.status || '').toLowerCase();
@@ -184,9 +185,8 @@ adminRouter.get('/overview-stats', requireRoles(['admin']), async (req, res: Res
     const dateMap = new Map<string, { present: number; absent: number; late: number; total: number }>();
     const now = new Date();
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      const iso = d.toISOString().split('T')[0];
+      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const iso = getZonedDateString(d);
       dateMap.set(iso, { present: 0, absent: 0, late: 0, total: 0 });
     }
 

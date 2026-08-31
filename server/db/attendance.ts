@@ -20,11 +20,11 @@ export async function getAttendanceByStudent(identifier: string, email?: string)
         .find({ email: targetEmail })
         .sort({ date: -1 })
         .lean();
-      if (docs && docs.length > 0) {
+      if (Array.isArray(docs)) {
         return docs.map((doc: any) => formatAttendanceDoc(doc, targetUser));
       }
-    } catch {
-      // fallback
+    } catch (err) {
+      console.error('[DB] Mongo getAttendanceByStudent error:', err);
     }
   }
 
@@ -60,14 +60,14 @@ export async function getAttendanceBySectionAndDate(
           date,
         })
         .lean();
-      if (docs && docs.length > 0) {
+      if (Array.isArray(docs)) {
         return docs.map((doc: any) => {
           const user = userMap.get((doc.email || '').toLowerCase());
           return formatAttendanceDoc(doc, user);
         });
       }
-    } catch {
-      // fallback
+    } catch (err) {
+      console.error('[DB] Mongo getAttendanceBySectionAndDate error:', err);
     }
   }
 
@@ -89,14 +89,14 @@ export async function getAllAttendance(): Promise<AttendanceRecord[]> {
   if (isMongoConnected) {
     try {
       const docs = await (AttendanceModel as any).find().sort({ date: -1 }).lean();
-      if (docs && docs.length > 0) {
+      if (Array.isArray(docs)) {
         return docs.map((doc: any) => {
           const user = userMap.get((doc.email || '').toLowerCase());
           return formatAttendanceDoc(doc, user);
         });
       }
-    } catch {
-      // fallback
+    } catch (err) {
+      console.error('[DB] Mongo getAllAttendance error:', err);
     }
   }
 

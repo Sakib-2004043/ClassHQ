@@ -13,7 +13,7 @@ import {
   getHolidaysBySection,
 } from '../db/index.ts';
 import { requireAuth, requireRoles, authMiddleware, AuthenticatedRequest } from '../auth.ts';
-import { isTimeWithinWindow } from '../utils/timeWindow.ts';
+import { isTimeWithinWindow, getNextAcademicDate, getZonedDateString } from '../utils/timeWindow.ts';
 import {
   AttendanceRecord,
   AttendanceStatus,
@@ -118,14 +118,7 @@ studentRouter.post('/self-attendance', requireAuth, async (req: AuthenticatedReq
       return;
     }
 
-    const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-    while (targetDate.getDay() === 5 || targetDate.getDay() === 6) {
-      targetDate.setDate(targetDate.getDate() + 1);
-    }
-    const y = targetDate.getFullYear();
-    const m = String(targetDate.getMonth() + 1).padStart(2, '0');
-    const d = String(targetDate.getDate()).padStart(2, '0');
-    const calculatedDateStr = `${y}-${m}-${d}`;
+    const calculatedDateStr = getNextAcademicDate(now);
     const dateStr =
       req.body.date && typeof req.body.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date)
         ? req.body.date
@@ -415,7 +408,7 @@ studentRouter.get('/active-holiday', requireAuth, async (req: AuthenticatedReque
   try {
     const userBatch = req.user?.batch || req.user?.assignedBatch || (req.query.batch as string) || 'HSC 2026';
     const userSection = req.user?.section || req.user?.assignedSection || (req.query.section as string) || 'A';
-    const dateStr = (req.query.date as string) || new Date().toISOString().split('T')[0];
+    const dateStr = (req.query.date as string) || getZonedDateString();
 
     const holiday = await getHolidayForDate(userBatch, userSection, dateStr);
     res.json({

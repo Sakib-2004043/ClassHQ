@@ -4,9 +4,9 @@ import { memoryUsers, isMongoConnected } from './connection.ts';
 import { UserModel } from './models.ts';
 import { formatUserDoc, compareBatch, compareSection, normalizeBatch, normalizeSection } from './helpers.ts';
 
-// In-memory cache for user list to eliminate repeated database roundtrips during roster and ledger loads
+// In-memory cache for user list with short TTL to reflect direct database modifications rapidly
 let usersCache: { data: User[]; timestamp: number } | null = null;
-const USERS_CACHE_TTL = 30000; // 30 seconds TTL
+const USERS_CACHE_TTL = 3000; // 3 seconds TTL
 
 export function invalidateUsersCache() {
   usersCache = null;
@@ -116,7 +116,7 @@ export async function getAllUsers(forceRefresh = false): Promise<User[]> {
   if (isMongoConnected) {
     try {
       const docs = await (UserModel as any).find().lean();
-      if (docs && docs.length > 0) {
+      if (Array.isArray(docs)) {
         const formatted = docs.map(formatUserDoc);
         usersCache = { data: formatted, timestamp: now };
         return formatted;

@@ -4,6 +4,7 @@ import { memoryAttendance, isMongoConnected } from './connection.ts';
 import { AttendanceModel } from './models.ts';
 import { getAllUsers } from './users.ts';
 import { formatLeaveDoc, compareBatch, compareSection } from './helpers.ts';
+import { getZonedDateString } from '../utils/dateUtils.ts';
 
 function buildLeaveMongoQuery(id: string) {
   const orConditions: any[] = [{ id: id }, { id: id.toLowerCase() }];
@@ -63,15 +64,15 @@ export async function getAllLeaveRequests(): Promise<LeaveRequest[]> {
         })
         .sort({ date: -1 })
         .lean();
-      if (docs && docs.length > 0) {
+      if (Array.isArray(docs)) {
         return docs.map((doc: any) => {
           const email = (doc.email || '').toLowerCase();
           const user = userMap.get(email);
           return formatLeaveDoc(doc, user);
         });
       }
-    } catch {
-      // fallback
+    } catch (err) {
+      console.error('[DB] Mongo getAllLeaveRequests error:', err);
     }
   }
 
@@ -107,11 +108,11 @@ export async function getLeavesByStudent(identifier: string, email?: string): Pr
         })
         .sort({ date: -1 })
         .lean();
-      if (docs && docs.length > 0) {
+      if (Array.isArray(docs)) {
         return docs.map((doc: any) => formatLeaveDoc(doc, targetUser));
       }
-    } catch {
-      // fallback
+    } catch (err) {
+      console.error('[DB] Mongo getLeavesByStudent error:', err);
     }
   }
 
@@ -148,15 +149,15 @@ export async function getLeavesBySection(batch: string, section: string): Promis
         })
         .sort({ date: -1 })
         .lean();
-      if (docs && docs.length > 0) {
+      if (Array.isArray(docs)) {
         return docs.map((doc: any) => {
           const email = (doc.email || '').toLowerCase();
           const user = userMap.get(email);
           return formatLeaveDoc(doc, user);
         });
       }
-    } catch {
-      // fallback
+    } catch (err) {
+      console.error('[DB] Mongo getLeavesBySection error:', err);
     }
   }
 
@@ -181,7 +182,7 @@ export async function createLeaveRequest(leave: LeaveRequest): Promise<LeaveRequ
   const email = (leave.studentEmail || (leave as any).email || '').trim().toLowerCase();
   const user = allUsers.find((u) => u.email.toLowerCase() === email || u.id === leave.studentId);
   const targetEmail = user?.email.toLowerCase() || email;
-  const leaveDate = leave.startDate || (leave as any).leaveDate || new Date().toISOString().split('T')[0];
+  const leaveDate = leave.startDate || (leave as any).leaveDate || getZonedDateString();
 
   const category = leave.leaveType || leave.leaveReason || 'Casual';
   const detailedReason = leave.reason || leave.studentsNote || '';

@@ -18,6 +18,7 @@ import {
   deleteHoliday,
   checkCaptainEditPermission,
 } from '../db/index.ts';
+import { getZonedDateString } from '../utils/dateUtils.ts';
 import {
   authMiddleware,
   requireRoles,
@@ -46,7 +47,7 @@ captainRouter.get('/roster', async (req: AuthenticatedRequest, res: Response) =>
 
     const section = isCaptain && userSection ? userSection : (req.query.section as string) || userSection || 'A';
     const batch = isCaptain && userBatch ? userBatch : (req.query.batch as string) || userBatch || 'HSC 2026';
-    const date = (req.query.date as string) || new Date().toISOString().split('T')[0];
+    const date = (req.query.date as string) || getZonedDateString();
 
     const allUsers = await getAllUsers();
     const sectionStudents = allUsers.filter((u) => {
@@ -159,7 +160,7 @@ captainRouter.get('/roster', async (req: AuthenticatedRequest, res: Response) =>
 captainRouter.get('/edit-permission', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { date } = req.query;
-    const targetDate = (date as string) || new Date().toISOString().split('T')[0];
+    const targetDate = (date as string) || getZonedDateString();
     const permission = await checkCaptainEditPermission(req.user!, targetDate);
     res.json(permission);
   } catch (err: any) {
@@ -307,7 +308,7 @@ captainRouter.get('/section-stats', async (req: AuthenticatedRequest, res: Respo
 
     const section = isCaptain && userSection ? userSection : (req.query.section as string) || userSection || 'A';
     const batch = isCaptain && userBatch ? userBatch : (req.query.batch as string) || userBatch || 'HSC 2026';
-    const today = new Date().toISOString().split('T')[0];
+    const today = getZonedDateString();
 
     const allUsers = await getAllUsers();
     const sectionStudents = allUsers.filter((u) => {

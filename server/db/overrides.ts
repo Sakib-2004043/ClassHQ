@@ -2,6 +2,7 @@ import { AttendanceEditOverride, CaptainEditPermissionStatus, HSCBatch, Section,
 import { memoryOverrides, isMongoConnected } from './connection.ts';
 import { AttendanceEditOverrideModel } from './models.ts';
 import { compareBatch, compareSection } from './helpers.ts';
+import { getZonedDateString, getZonedMinutes, getZonedTimeString } from '../utils/dateUtils.ts';
 
 export function formatOverrideDoc(doc: any): AttendanceEditOverride {
   if (!doc) return doc;
@@ -274,16 +275,14 @@ export async function checkCaptainEditPermission(
   targetDate: string
 ): Promise<CaptainEditPermissionStatus> {
   const now = new Date();
-  // Server date formatted in YYYY-MM-DD
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const serverDate = `${year}-${month}-${day}`;
+  // Server date synchronized with Bangladesh Timezone (Asia/Dhaka)
+  const serverDate = getZonedDateString(now);
+  const serverTime = getZonedTimeString(now);
 
   const isSameDay = targetDate === serverDate;
 
-  // Window: 12:05 AM to 11:55 PM
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  // Window: 12:05 AM to 11:55 PM in Bangladesh Timezone
+  const currentMinutes = getZonedMinutes(now);
   const startMinutes = 5; // 00:05 (12:05 AM)
   const endMinutes = 23 * 60 + 55; // 23:55 (11:55 PM)
 
@@ -309,8 +308,6 @@ export async function checkCaptainEditPermission(
 
   // Check if an active override exists for this captain and target date
   const activeOverride = activeGrants.find((o) => o.targetDate === targetDate) || null;
-
-  const serverTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   if (activeOverride) {
     const remainingSeconds = Math.max(

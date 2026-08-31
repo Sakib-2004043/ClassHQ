@@ -1,4 +1,5 @@
 import { User, AttendanceRecord, AttendanceStatus, LeaveRequest, LeaveStatus, LeaveType } from '../../src/types.ts';
+import { getZonedDateString } from '../utils/dateUtils.ts';
 
 export function normalizeBatch(batch?: string | null): string {
   if (!batch) return '';
@@ -144,7 +145,7 @@ export function formatAttendanceDoc(doc: any, user?: User | null): AttendanceRec
 export function formatLeaveDoc(doc: any, user?: User | null): LeaveRequest {
   if (!doc) return doc;
   const email = (doc.email || doc.studentEmail || user?.email || '').trim().toLowerCase();
-  const date = doc.date || doc.leaveDate || doc.startDate || new Date().toISOString().split('T')[0];
+  const date = doc.date || doc.leaveDate || doc.startDate || getZonedDateString();
 
   let resolvedStatus: LeaveStatus = 'Pending';
   if (doc.leaveStatus && doc.leaveStatus !== 'None') {
